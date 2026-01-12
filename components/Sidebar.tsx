@@ -14,7 +14,8 @@ import {
   ChevronRight,
   DollarSign,
   Smartphone,
-  X
+  X,
+  PieChart
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,6 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isOpen, onClose }) => {
     { name: 'Terminal Mecânico', icon: Smartphone, path: '/terminal', roles: ['Dono', 'Funcionário'] },
     { name: 'Criar Nota', icon: PlusSquare, path: '/orders/new', roles: ['Dono', 'Recepção', 'Funcionário'] },
     { name: 'Notas Geradas', icon: FileText, path: '/orders', roles: ['Dono', 'Recepção', 'Funcionário'] },
+    { name: 'Financeiro', icon: PieChart, path: '/financial', roles: ['Dono'] },
     { name: 'Cobranças', icon: DollarSign, path: '/billing', roles: ['Dono', 'Recepção'] },
     { name: 'Clientes', icon: Users, path: '/clients', roles: ['Dono', 'Recepção'] },
     { name: 'Veículos', icon: Car, path: '/vehicles', roles: ['Dono', 'Recepção', 'Funcionário'] },

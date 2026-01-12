@@ -15,10 +15,13 @@ import {
   Loader2,
   Download,
   DollarSign,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  Wallet,
+  Smartphone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Client, Vehicle, OSItem, OSStatus, ServiceOrder, PaymentStatus, UserSession } from '../types';
+import { Client, Vehicle, OSItem, OSStatus, ServiceOrder, PaymentStatus, UserSession, PaymentMethod, TransactionType, FinancialTransaction } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import html2canvas from 'html2canvas';
 
@@ -38,7 +41,8 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
   const [items, setItems] = useState<OSItem[]>([]);
   const [labor, setLabor] = useState<string>('0');
   const [discount, setDiscount] = useState<string>('0');
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PENDENTE);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PAGO);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(PaymentMethod.PIX);
   
   const [showInvoice, setShowInvoice] = useState(false);
   const [osData, setOsData] = useState<ServiceOrder | null>(null);
@@ -82,7 +86,8 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
         contents: `Como um mecânico especialista de elite da Kaenpro, analise o seguinte problema: "${problem}" no veículo ${selectedVehicle.model}. Sugira 3 peças prováveis e um valor estimado de mão de obra. Responda em JSON puro seguindo o formato: {"items": [{"desc": "nome peça", "price": 100}], "labor": 200, "explanation": "breve explicação"}`,
       });
       
-      const data = JSON.parse(response.text.replace(/```json|```/g, "").trim());
+      const text = response.text || '';
+      const data = JSON.parse(text.replace(/```json|```/g, "").trim());
       
       const newItems: OSItem[] = data.items.map((i: any) => ({
         id: Math.random().toString(36).substr(2, 9),
@@ -126,9 +131,13 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
 
   const handleFinalize = async () => {
     if (!selectedClient || !selectedVehicle || !session || !syncData) return;
+    
+    const osId = Math.random().toString(36).substr(2, 9);
+    const osNumber = `KP-${Date.now().toString().slice(-6)}`;
+    
     const newOs: ServiceOrder = {
-      id: Math.random().toString(36).substr(2, 9),
-      osNumber: `KP-${Date.now().toString().slice(-6)}`,
+      id: osId,
+      osNumber: osNumber,
       clientId: selectedClient.id,
       clientName: selectedClient.name,
       vehicleId: selectedVehicle.id,
@@ -142,11 +151,31 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
       totalValue,
       status: OSStatus.FINALIZADO,
       paymentStatus,
+      paymentMethod: selectedPaymentMethod,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    const existing = JSON.parse(localStorage.getItem(`kaenpro_${session.username}_orders`) || '[]');
-    await syncData('orders', [...existing, newOs]);
+
+    // REGISTRO FINANCEIRO AUTOMÁTICO
+    const newTransaction: FinancialTransaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: TransactionType.INCOME,
+      category: 'Serviço Automotivo',
+      amount: totalValue,
+      method: selectedPaymentMethod,
+      description: `OS #${osNumber} - ${selectedVehicle.plate}`,
+      relatedId: osId,
+      date: new Date().toISOString()
+    };
+
+    // Salvar Ordens
+    const existingOrders = JSON.parse(localStorage.getItem(`kaenpro_${session.username}_orders`) || '[]');
+    await syncData('orders', [...existingOrders, newOs]);
+    
+    // Salvar Transações
+    const existingTransactions = JSON.parse(localStorage.getItem(`kaenpro_${session.username}_transactions`) || '[]');
+    await syncData('transactions', [...existingTransactions, newTransaction]);
+    
     setOsData(newOs);
     setShowInvoice(true);
   };
@@ -187,7 +216,7 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
                    />
                 </div>
                 {filteredClients.map(c => (
-                  <button key={c.id} onClick={() => handleSelectClient(c)} className="w-full p-6 flex justify-between bg-zinc-900/50 rounded-3xl mb-2 hover:bg-[#E11D48] group transition-all">
+                  <button key={c.id} onClick={() => handleSelectClient(c)} className="w-full p-6 flex justify-between bg-zinc-900/50 rounded-3xl mb-2 hover:bg-[#E11D48] group transition-all text-left">
                     <span className="font-black text-white uppercase">{c.name}</span>
                     <ChevronRight size={18} />
                   </button>
@@ -204,9 +233,10 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   {clientVehicles.map(v => (
-                    <button key={v.id} onClick={() => setSelectedVehicle(v)} className={`p-6 rounded-[2rem] border-2 transition-all ${selectedVehicle?.id === v.id ? 'bg-[#E11D48]/10 border-[#E11D48]' : 'bg-zinc-950 border-zinc-800'}`}>
+                    <button key={v.id} onClick={() => setSelectedVehicle(v)} className={`p-6 rounded-[2rem] border-2 transition-all text-left ${selectedVehicle?.id === v.id ? 'bg-[#E11D48]/10 border-[#E11D48]' : 'bg-zinc-950 border-zinc-800'}`}>
                       <Car size={22} className="mb-2" />
                       <p className="font-black text-white">{v.plate}</p>
+                      <p className="text-[10px] text-zinc-500 font-bold">{v.model}</p>
                     </button>
                   ))}
                 </div>
@@ -244,8 +274,8 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
                 {items.map(item => (
                   <div key={item.id} className="flex gap-4 p-4 bg-[#050505] border border-zinc-900 rounded-3xl items-center">
                     <input type="text" placeholder="DESCRIÇÃO..." value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value.toUpperCase())} className="flex-1 bg-transparent border-none text-xs text-white font-bold outline-none" />
-                    <input type="number" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} className="w-12 bg-zinc-900 rounded-lg py-2 text-center text-xs font-black" />
-                    <input type="number" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} className="w-20 bg-zinc-900 rounded-lg py-2 text-center text-xs font-black" />
+                    <input type="number" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value))} className="w-12 bg-zinc-900 rounded-lg py-2 text-center text-xs font-black" />
+                    <input type="number" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value))} className="w-20 bg-zinc-900 rounded-lg py-2 text-center text-xs font-black" />
                     <button onClick={() => setItems(items.filter(i => i.id !== item.id))} className="text-zinc-800 hover:text-red-500"><Trash2 size={16}/></button>
                   </div>
                 ))}
@@ -260,12 +290,47 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
               <p className="text-4xl font-black text-white italic">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               <DollarSign className="absolute top-1/2 -right-4 -translate-y-1/2 text-white/10" size={100} />
            </div>
-           <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-zinc-600 uppercase ml-2 italic">Mão de Obra (R$)</label>
-                <input type="number" value={labor} onChange={(e) => setLabor(e.target.value)} className="w-full bg-[#050505] border-2 border-zinc-900 rounded-2xl px-6 py-5 text-white font-black text-xl outline-none" />
+
+           <div className="space-y-6">
+              <div>
+                <label className="text-[9px] font-black text-zinc-600 uppercase ml-2 italic block mb-3">Mão de Obra Técnica (R$)</label>
+                <input type="number" value={labor} onChange={(e) => setLabor(e.target.value)} className="w-full bg-[#050505] border-2 border-zinc-900 rounded-2xl px-6 py-5 text-white font-black text-xl outline-none focus:border-[#E11D48]" />
               </div>
-              <button onClick={handleFinalize} disabled={!selectedVehicle} className="w-full bg-white text-black py-7 rounded-[2.5rem] font-black uppercase text-[10px] tracking-[0.3em] hover:bg-[#E11D48] hover:text-white transition-all disabled:opacity-20 italic">Processar Nota Cloud</button>
+
+              <div>
+                <label className="text-[9px] font-black text-zinc-600 uppercase ml-2 italic block mb-3">Forma de Pagamento</label>
+                <div className="grid grid-cols-2 gap-3">
+                   <button 
+                    onClick={() => setSelectedPaymentMethod(PaymentMethod.PIX)}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${selectedPaymentMethod === PaymentMethod.PIX ? 'border-[#E11D48] bg-[#E11D48]/10 text-white' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                   >
+                     <Smartphone size={20} />
+                     <span className="text-[10px] font-black">PIX</span>
+                   </button>
+                   <button 
+                    onClick={() => setSelectedPaymentMethod(PaymentMethod.CARTAO_CREDITO)}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${selectedPaymentMethod === PaymentMethod.CARTAO_CREDITO ? 'border-[#E11D48] bg-[#E11D48]/10 text-white' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                   >
+                     <CreditCard size={20} />
+                     <span className="text-[10px] font-black">CARTÃO</span>
+                   </button>
+                   <button 
+                    onClick={() => setSelectedPaymentMethod(PaymentMethod.DINHEIRO)}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${selectedPaymentMethod === PaymentMethod.DINHEIRO ? 'border-[#E11D48] bg-[#E11D48]/10 text-white' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                   >
+                     <Wallet size={20} />
+                     <span className="text-[10px] font-black">DINHEIRO</span>
+                   </button>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleFinalize} 
+                disabled={!selectedVehicle} 
+                className="w-full bg-white text-black py-7 rounded-[2.5rem] font-black uppercase text-[10px] tracking-[0.3em] hover:bg-[#E11D48] hover:text-white transition-all disabled:opacity-20 italic shadow-xl"
+              >
+                Processar Nota Cloud
+              </button>
            </div>
         </div>
       </div>
@@ -277,17 +342,18 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
                <button onClick={downloadAsImage} className="bg-[#E11D48] text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase flex items-center gap-2">
                  {isGeneratingImage ? <Loader2 className="animate-spin"/> : <Download/>} Salvar Imagem
                </button>
-               <button onClick={() => setShowInvoice(false)} className="text-zinc-400 hover:text-black"><X size={28}/></button>
+               <button onClick={() => { setShowInvoice(false); navigate('/orders'); }} className="text-zinc-400 hover:text-black"><X size={28}/></button>
              </div>
              <div ref={invoiceRef} className="p-16 bg-white">
                 <div className="flex justify-between border-b-4 border-black pb-8 mb-10">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center text-white"><Wrench size={32}/></div>
-                    <h1 className="text-3xl font-black tracking-tighter italic">KAEN <span className="text-[#E11D48]">PRO</span></h1>
+                    <h1 className="text-3xl font-black tracking-tighter italic uppercase">KAEN <span className="text-[#E11D48]">PRO</span></h1>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-black text-zinc-400 uppercase italic">OS NÚMERO</p>
                     <p className="text-3xl font-black">{osData.osNumber}</p>
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase">{osData.paymentMethod} • {osData.paymentStatus}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-8 mb-10">
@@ -310,7 +376,7 @@ const NewServiceOrder: React.FC<{ session?: UserSession; syncData?: (key: string
                   </tbody>
                 </table>
                 <div className="text-right pt-10 border-t-4 border-black">
-                  <p className="text-[10px] font-black text-zinc-400 italic">Total Geral Devido</p>
+                  <p className="text-[10px] font-black text-zinc-400 italic">Total Geral Recebido</p>
                   <p className="text-6xl font-black italic">R$ {osData.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 </div>
              </div>

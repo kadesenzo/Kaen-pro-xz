@@ -12,6 +12,30 @@ export enum PaymentStatus {
   ATRASADO = 'Atrasado'
 }
 
+export enum TransactionType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE'
+}
+
+export enum PaymentMethod {
+  PIX = 'PIX',
+  DINHEIRO = 'Dinheiro',
+  CARTAO_CREDITO = 'Cartão de Crédito',
+  CARTAO_DEBITO = 'Cartão de Débito',
+  OUTRO = 'Outro'
+}
+
+export interface FinancialTransaction {
+  id: string;
+  type: TransactionType;
+  category: string;
+  amount: number;
+  method: PaymentMethod;
+  description: string;
+  relatedId?: string; // OS ID ou referência
+  date: string;
+}
+
 export enum SyncStatus {
   SYNCED = 'Synced',
   SYNCING = 'Syncing',
@@ -79,20 +103,6 @@ export interface BillingContact {
   level: string;
 }
 
-export interface VehicleChecklist {
-  id: string;
-  vehicleId: string;
-  plate: string;
-  clientName: string;
-  clientPhone: string;
-  km: string;
-  fuelLevel: string;
-  damages: string[];
-  items: Record<string, boolean>;
-  observations: string;
-  createdAt: string;
-}
-
 export interface ServiceOrder {
   id: string;
   osNumber: string;
@@ -109,8 +119,23 @@ export interface ServiceOrder {
   totalValue: number;
   status: OSStatus;
   paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod;
   dueDate?: string;
   billingHistory?: BillingContact[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Interface representing a vehicle entry checklist.
+ * Defines the state of the vehicle when it arrives at the shop.
+ */
+export interface VehicleChecklist {
+  id: string;
+  vehicleId: string;
+  fuelLevel: string;
+  damages: string[];
+  items: Record<string, boolean>;
+  observations: string;
+  createdAt: string;
 }

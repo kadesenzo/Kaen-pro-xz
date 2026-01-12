@@ -13,6 +13,7 @@ import Vehicles from './views/Vehicles';
 import VehicleDetails from './views/VehicleDetails';
 import Employees from './views/Employees';
 import Billing from './views/Billing';
+import Financial from './views/Financial';
 import MechanicTerminal from './views/MechanicTerminal';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -115,6 +116,7 @@ const App: React.FC = () => {
         <Route path="/orders" element={<PrivateLayout><ServiceOrders /></PrivateLayout>} />
         <Route path="/orders/new" element={<PrivateLayout><NewServiceOrder /></PrivateLayout>} />
         <Route path="/billing" element={<PrivateLayout><Billing /></PrivateLayout>} />
+        <Route path="/financial" element={<PrivateLayout><Financial /></PrivateLayout>} />
         <Route path="/inventory" element={<PrivateLayout><Inventory /></PrivateLayout>} />
         <Route path="/clients" element={<PrivateLayout><Clients role={session?.role || 'Dono'} /></PrivateLayout>} />
         <Route path="/clients/:id" element={<PrivateLayout><ClientDetails role={session?.role || 'Dono'} /></PrivateLayout>} />
